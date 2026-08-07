@@ -1,0 +1,4 @@
+torch>=2.1.0
+faster-whisper>=1.0.3
+silero-vad>=5.1.2
+torchcodec

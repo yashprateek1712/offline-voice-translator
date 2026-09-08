@@ -7,7 +7,7 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-CUDA-orange?style=for-the-badge&logo=pytorch)
 ![Flask](https://img.shields.io/badge/Flask-Web_UI-green?style=for-the-badge&logo=flask)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
-
+![App UI](ui.png)
 ---
 
 ## 📑 Table of Contents

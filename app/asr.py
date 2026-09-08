@@ -35,22 +35,8 @@ def load_asr_model(model_size: str = "large-v3-turbo", device: str = "cpu", comp
     return WhisperModel(model_size, device=device, compute_type=compute_type)
 
 
-    segments, info = model.transcribe(
-        audio_path,
-        beam_size=5,
-        language=language,
-        # Only matters when auto-detecting (language=None): analyzes more of
-        # the audio before committing to a language guess, instead of just
-        # the first segment. Bumped from 3 to 8 - short-clip/low-resource-
-        # language cases (and singing, where the intro/outro can be pure
-        # instrumental) need more of the file sampled before the guess is
-        # trustworthy. Costs more upfront scan time; worth it for accuracy
-        # in an offline tool where there's no round-trip latency pressure.
-        language_detection_segments=8,
-        # Prevent repetition loops (hallucinations like "oh oh oh...") during
-        # instrumental sections or long silences by not feeding previous text.
-        condition_on_previous_text=False,  # <--- THIS IS THE NEW LINE YOU NEED TO PASTE
-    )
+def transcribe_audio(model: WhisperModel, audio_path: str, language: str = None,
+                     music_mode: bool = False) -> tuple[list[dict], str, float, float]:
     """
     Transcribe an audio file and return
     (segments, detected_language_code, language_confidence, duration_seconds).
@@ -109,6 +95,9 @@ def load_asr_model(model_size: str = "large-v3-turbo", device: str = "cpu", comp
         # trustworthy. Costs more upfront scan time; worth it for accuracy
         # in an offline tool where there's no round-trip latency pressure.
         language_detection_segments=8,
+        # Prevent repetition loops (hallucinations like "oh oh oh...") during
+        # instrumental sections or long silences by not feeding previous text.
+        condition_on_previous_text=False,
     )
 
     language_confidence = info.language_probability

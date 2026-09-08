@@ -125,13 +125,30 @@ def load_audio_as_tensor(audio_path: str, target_sample_rate: int = TARGET_SAMPL
             Path(tmp_wav).unlink(missing_ok=True)
 
 
-def detect_speech_segments(audio_path: str, sampling_rate: int = TARGET_SAMPLE_RATE) -> list[dict]:
+def detect_speech_segments(audio_path: str, sampling_rate: int = TARGET_SAMPLE_RATE,
+                           threshold: float = 0.5, min_silence_duration_ms: int = 100) -> list[dict]:
     """
     Run Silero-VAD on an audio file and return speech segment timestamps.
 
     Args:
         audio_path: Path to a WAV file (mono, ideally 16kHz).
         sampling_rate: Sample rate VAD expects (Silero-VAD supports 8000 or 16000).
+        threshold: Speech-probability cutoff (0-1). Lower catches more
+            borderline audio as "speech" at the cost of also catching more
+            noise. 0.5 is Silero's own default, tuned for normal speech.
+        min_silence_duration_ms: How long a quiet stretch must last before
+            it's treated as a real gap between speech segments, rather than
+            a normal pause within one. Silero's default (100ms) is tuned
+            for spoken conversation; singing has longer natural pauses
+            between phrases that a short threshold like this can slice up
+            or drop.
+
+        These two are exposed (rather than hardcoded) specifically for
+        pipeline.py's music_mode - singing often doesn't score as
+        confidently as speech, and short instrumental gaps between vocal
+        lines can get misread as silence to cut out. A caller dealing with
+        song/music input can loosen both; normal speech callers get
+        Silero's untouched defaults.
 
     Returns:
         List of dicts like {"start": 0.52, "end": 3.14} in seconds.
@@ -143,13 +160,16 @@ def detect_speech_segments(audio_path: str, sampling_rate: int = TARGET_SAMPLE_R
         wav,
         model,
         sampling_rate=sampling_rate,
+        threshold=threshold,
+        min_silence_duration_ms=min_silence_duration_ms,
         return_seconds=True,
     )
     return speech_timestamps
 
 
 def extract_speech_audio(audio_path: str, segments: list[dict] | None = None,
-                         sampling_rate: int = TARGET_SAMPLE_RATE, padding: float = 0.15):
+                         sampling_rate: int = TARGET_SAMPLE_RATE, padding: float = 0.15,
+                         threshold: float = 0.5, min_silence_duration_ms: int = 100):
     """
     Return only the detected speech portions of the audio, concatenated
     into one array - avoids feeding Whisper long stretches of silence or
@@ -157,14 +177,26 @@ def extract_speech_audio(audio_path: str, segments: list[dict] | None = None,
     `padding` keeps a small buffer around each segment so words at a
     boundary aren't clipped. Falls back to the full audio if nothing was
     detected, rather than returning an empty array.
+
+    `threshold`/`min_silence_duration_ms` only matter when `segments` isn't
+    already supplied (they're passed to get_speech_timestamps internally,
+    same meaning as in detect_speech_segments) - if segments were already
+    computed by an earlier detect_speech_segments() call, that call's
+    settings are what actually decided them, these are ignored.
     """
     wav = load_audio_as_tensor(audio_path, sampling_rate)
+    original_duration = wav.shape[0] / sampling_rate
 
     if segments is None:
         model = load_silero_vad()
-        segments = get_speech_timestamps(wav, model, sampling_rate=sampling_rate, return_seconds=True)
+        segments = get_speech_timestamps(
+            wav, model, sampling_rate=sampling_rate,
+            threshold=threshold, min_silence_duration_ms=min_silence_duration_ms,
+            return_seconds=True,
+        )
 
     if not segments:
+        print(f"  extract_speech_audio: no speech detected in {original_duration:.1f}s of audio - returning it unmodified.")
         return wav.numpy()
 
     pad_samples = int(padding * sampling_rate)
@@ -175,7 +207,11 @@ def extract_speech_audio(audio_path: str, segments: list[dict] | None = None,
         end = min(total_samples, int(seg["end"] * sampling_rate) + pad_samples)
         chunks.append(wav[start:end])
 
-    return torch.cat(chunks).numpy()
+    result = torch.cat(chunks).numpy()
+    kept_duration = len(result) / sampling_rate
+    print(f"  extract_speech_audio: kept {kept_duration:.1f}s of {original_duration:.1f}s original audio "
+          f"({kept_duration/original_duration:.0%}) across {len(segments)} segment(s)")
+    return result
 
 
 def main():

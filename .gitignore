@@ -1,26 +1,10 @@
-# Virtual environments
-venv/
-env/
-
-# Python cache
 __pycache__/
-*.pyc
-*.egg-info/
-
-# Model weights - this is the important one, keeps 1.6GB+ files out of git
 models/
-
-# Audio files (test samples are fine to commit small ones manually if you want,
-# but don't auto-track every wav - especially generated outputs)
+samples/
 *.wav
-
-# Pipeline outputs
-output.json
-samples/output.json
-
-# Environment secrets
+*.mp3
+*.ogg
+*.m4a
+*.webm
+*.json
 .env
-
-# OS/editor junk
-.DS_Store
-.vscode/

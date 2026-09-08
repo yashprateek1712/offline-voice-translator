@@ -42,7 +42,31 @@ This project provides a complete, end-to-end pipeline to convert spoken audio or
 
 The app operates on a highly optimized pipeline. Audio is pre-processed on the CPU, transcribed and translated on the GPU (for speed), and finally synthesized back to audio on the CPU (to save VRAM).
 
-![Architecture Flowchart](architecture.png)
+┌────────────────┐
+│   User Input   │
+└───────┬────────┘
+        ▼
+ [Live Mic / File]  ──────────────┐
+        ▼                         │
+┌────────────────┐                │ 
+│ Silero VAD CPU │                │ [Typed Text]
+└───────┬────────┘                │
+        ▼ (Trims Silence)         │
+┌───────────────────────────┐     │
+│ Whisper large-v3-turbo GPU│     │
+└───────┬───────────────────┘     │
+        ▼ (Text & Lang Detect)    ▼
+┌─────────────────────────────────┐
+│        NLLB-200 1.3B GPU        │
+└───────┬─────────────────────────┘
+        ▼ (Translates Sentence)
+┌────────────────┐
+│ Piper TTS CPU  │
+└───────┬────────┘
+        ▼
+┌──────────────────────┐
+│  Synthesized Audio   │
+└──────────────────────┘
 
 ---
 
